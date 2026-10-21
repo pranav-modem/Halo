@@ -1,0 +1,144 @@
+{
+  "name": "halo",
+  "productName": "Halo",
+  "version": "0.1.0",
+  "description": "A small AI companion that lives on your desktop and brings your work into one place. Runs on your own Claude Code login.",
+  "author": "Pranav Modem",
+  "contributors": [
+    "Claude <noreply@anthropic.com>"
+  ],
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/pranav-modem/Halo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pranav-modem/Halo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pranav-modem/Halo/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "desktop",
+    "electron",
+    "productivity",
+    "assistant",
+    "macos",
+    "windows"
+  ],
+  "main": "src/main/main.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "gallery": "python3 -m http.server 5180 --directory src",
+    "icons": "electron scripts/make-icons.mjs",
+    "check": "node scripts/check.mjs",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "44.6.0",
+    "electron-builder": "26.16.1"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.0"
+  },
+  "build": {
+    "appId": "app.halo.desktop",
+    "productName": "Halo",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "!src/renderer/gallery.*",
+      "!src/renderer/icon-render.*",
+      "!node_modules/onnxruntime-node/bin/napi-v*/linux/**"
+    ],
+    "asarUnpack": [
+      "src/hook/**",
+      "node_modules/onnxruntime-node/**",
+      "node_modules/sharp/**",
+      "node_modules/@img/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
+      "identity": null,
+      "files": [
+        "!node_modules/onnxruntime-node/bin/napi-v*/win32/**",
+        "!node_modules/@img/sharp-win32-*/**"
+      ],
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSMicrophoneUsageDescription": "Halo records your microphone only when you start a meeting recording.",
+        "NSAudioCaptureUsageDescription": "Halo can include system audio in a meeting recording when you turn it on.",
+        "NSScreenCaptureUsageDescription": "Halo captures your screen only when you ask it about your screen."
+      },
+      "artifactName": "Halo-${version}-mac-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false,
+      "files": [
+        "!node_modules/onnxruntime-node/bin/napi-v*/darwin/**",
+        "!node_modules/@img/sharp-darwin-*/**",
+        "!node_modules/@img/sharp-libvips-darwin*/**"
+      ],
+      "artifactName": "Halo-${version}-windows-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Halo",
+      "artifactName": "Halo-${version}-windows-setup.${ext}"
+    },
+    "afterPack": "scripts/after-pack.cjs",
+    "dmg": {
+      "title": "Halo",
+      "iconSize": 96,
+      "contents": [
+        {
+          "x": 150,
+          "y": 190
+        },
+        {
+          "x": 410,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 560,
+        "height": 380
+      }
+    }
+  }
+}

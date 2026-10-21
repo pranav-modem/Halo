@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
+<title>Halo</title>
+<link rel="stylesheet" href="./room.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <canvas id="rail-char" aria-hidden="true"></canvas>
+      <button class="rail-btn" data-page="home" title="Home" aria-label="Home"><span class="ico" data-icon="home"></span></button>
+      <button class="rail-btn" data-page="activity" title="Activity" aria-label="Activity"><span class="ico" data-icon="pulse"></span></button>
+      <button class="rail-btn" data-page="general" title="Settings" aria-label="Settings"><span class="ico" data-icon="gear"></span></button>
+    </aside>
+    <header class="topbar">
+      <div class="crumbs"><span class="muted">Halo</span><span class="sep">/</span><span id="crumb">Home</span></div>
+      <span class="grow"></span>
+      <span class="status"><span class="sdot" id="status-dot"></span><span id="status-text">Starting…</span></span>
+    </header>
+    <nav class="sidebar" aria-label="Halo">
+      <div class="group">Halo</div>
+      <button class="nav" data-page="home"><span class="ico" data-icon="home"></span>Home</button>
+      <button class="nav" data-page="notes"><span class="ico" data-icon="notes"></span>Notes</button>
+      <button class="nav" data-page="pieces"><span class="ico" data-icon="clock"></span>Pieces</button>
+      <button class="nav" data-page="activity"><span class="ico" data-icon="pulse"></span>Activity</button>
+      <div class="group">Settings</div>
+      <button class="nav" data-page="general"><span class="ico" data-icon="gear"></span>General</button>
+      <button class="nav" data-page="look"><span class="ico" data-icon="look"></span>Look</button>
+      <button class="nav" data-page="claude"><span class="ico" data-icon="spark"></span>Claude Code</button>
+      <button class="nav" data-page="integrations"><span class="ico" data-icon="plug"></span>Integrations</button>
+      <button class="nav" data-page="alerts"><span class="ico" data-icon="board"></span>Alerts</button>
+      <button class="nav" data-page="voice"><span class="ico" data-icon="mic"></span>Notes and voice</button>
+      <button class="nav" data-page="shortcuts"><span class="ico" data-icon="key"></span>Shortcuts</button>
+    </nav>
+    <main class="content"><div class="page" id="page"></div></main>
+  </div>
+  <script type="module" src="./room.js"></script>
+</body>
+</html>
