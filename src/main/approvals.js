@@ -153,7 +153,8 @@ function ghApiRead(args) {
     else if (flag.startsWith("-") || endpoint) return false; // --input, -H, unknown flags, a second endpoint
     else endpoint = flag;
   }
-  if (!endpoint) return false;
+  // A GitHub API path, never a full URL: the request must stay with GitHub.
+  if (!endpoint || !/^\/?[\w.{}-]+(\/[\w.{}-]+)*(\?[\w.=&%,:+-]*)?$/.test(endpoint)) return false;
   if (endpoint !== "graphql") return fields.length === 0; // fields would turn the call into a POST
   const query = fields.find((f) => f.startsWith("query="));
   return !!query && !fields.some((f) => /\b(mutation|subscription)\b/i.test(f));
@@ -184,31 +185,32 @@ export function isSafeReadCommand(cmd) {
 
 // ── files written without asking ──────────────────────────────────────────────
 
-/** Where `p` really points, following symlinks in whatever part of it exists. */
-function realPath(p) {
-  let dir = path.resolve(p);
-  const rest = [];
-  while (!fs.existsSync(dir) && path.dirname(dir) !== dir) {
-    rest.unshift(path.basename(dir));
-    dir = path.dirname(dir);
-  }
-  try { dir = fs.realpathSync(dir); } catch {}
-  return path.join(dir, ...rest);
-}
+const isLink = (p) => {
+  try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; }
+};
 
-// Claude Code loads settings, hooks and instructions from files like these.
-const CONFIG_NAME = /^(\.|claude\.md$|agents\.md$)/i;
+// Plain file and folder names only: no dotfiles, no "~" short names, and
+// nothing Claude Code could read as instructions (CLAUDE.md, AGENTS.md…).
+const PLAIN_NAME = /^(?!claude|agents)[a-z0-9][\w .,()&+-]*$/i;
 
-/** Notes (.md / .txt) in the notes folder, and the memory file. Never config, never through a symlink. */
+/**
+ * Notes (.md / .txt) in the notes folder or one folder below it, and the
+ * memory file. Nothing on the way may be a symlink, even a dangling one.
+ */
 export function isSafeWrite(file, { notesDir, memoryFile } = {}) {
   if (!file) return false;
-  if (memoryFile && path.resolve(file) === path.resolve(memoryFile)) {
-    try { return !fs.lstatSync(memoryFile).isSymbolicLink(); } catch { return true; }
+  const target = path.resolve(file);
+  if (memoryFile && target === path.resolve(memoryFile)) return !isLink(target);
+  if (!notesDir || !/\.(md|txt)$/i.test(target)) return false;
+  const root = path.resolve(notesDir);
+  const parts = path.relative(root, target).split(path.sep);
+  if (parts.length > 2 || parts.some((seg) => !PLAIN_NAME.test(seg))) return false;
+  let at = root;
+  for (const seg of parts) {
+    at = path.join(at, seg);
+    if (isLink(at)) return false;
   }
-  if (!notesDir || !/\.(md|txt)$/i.test(file)) return false;
-  const rel = path.relative(realPath(notesDir), realPath(file));
-  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return false;
-  return !rel.split(path.sep).some((seg) => CONFIG_NAME.test(seg));
+  return true;
 }
 
 /** @returns {"allow" | "ask"} */
