@@ -163,7 +163,7 @@ app.whenReady().then(async () => {
   if (isMac && !store.get("showDock")) app.dock?.hide();
   nativeTheme.themeSource = store.get("theme") || "light";
 
-  approvals = new ApprovalServer({ safeDirs: () => [store.get("notesDir"), store.get("workspaceDir")] });
+  approvals = new ApprovalServer({ writable: () => ({ notesDir: store.get("notesDir"), memoryFile: memory?.file }) });
   await approvals.start();
   // Your own Claude Code sessions ask here only once you turn that on (Settings → Claude Code).
   ccPerms = new CcPermissionServer({

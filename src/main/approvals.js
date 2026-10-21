@@ -54,48 +54,169 @@ export function touchesSecrets(tool, input = {}) {
 const WRITE_BUILTINS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 const MCP_READ = /^(get|list|read|search|fetch|lookup|find|query|describe|view|my_|atlassianuserinfo|getaccessible|slack_read|slack_search)/i;
 
-const GH_READ = [
-  /^gh (pr|issue) (list|view|status|checks|diff)\b/,
-  /^gh search (prs|issues|repos|code|commits)\b/,
-  /^gh run (list|view)\b/,
-  /^gh repo (view|list)\b/,
-  /^gh (status|auth status)\b/,
-  /^gh release (list|view)\b/,
-];
-const ACLI_READ = [/^acli jira (workitem|project|board|sprint|filter|dashboard) (search|view|list|get)\b/, /^acli jira auth status\b/];
-const PIPE_OK = /^(jq|head|tail|grep|wc|sort|uniq|cut|tr|column)\b/;
+// ── shell commands that run without asking ─────────────────────────────────────
+// Only GitHub and Jira reads, optionally piped through a few filters. Anything
+// the parser doesn't fully understand asks.
+
+/**
+ * Splits a command into pipeline stages of words, honouring quotes. Returns
+ * null for anything beyond running and piping: redirection, chaining,
+ * expansion, globs, or substitution (even inside double quotes).
+ */
+export function parsePipeline(cmd) {
+  const stages = [[]];
+  let word = null;
+  let quote = "";
+  const end = () => {
+    if (word !== null) stages.at(-1).push(word);
+    word = null;
+  };
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (quote) {
+      if (ch === quote) quote = "";
+      else if (quote === '"' && /[$`\\!]/.test(ch)) return null;
+      else word += ch;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      word ??= "";
+    } else if (ch === " " || ch === "\t") end();
+    else if (ch === "|") {
+      end();
+      if (!stages.at(-1).length) return null;
+      stages.push([]);
+    } else if (/[\w@%+=:,./-]/.test(ch)) word = (word ?? "") + ch;
+    else return null; // ; & < > ` $ ( ) { } * ? [ ] ~ ! # \ newline …
+  }
+  end();
+  return !quote && stages.every((st) => st.length) ? stages : null;
+}
+
+/** True when every word is an allowed flag (values checked) and there are at most `positional` other words. */
+function onlyFlags(args, isFlag, { values = {}, positional = 0 } = {}) {
+  let count = 0;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    const joined = Object.keys(values).find((f) => a.startsWith(f) && a.length > f.length);
+    if (a in values) {
+      if (!values[a](args[++i] ?? "")) return false;
+    } else if (joined) {
+      if (!values[joined](a.slice(joined.length))) return false;
+    } else if (a.startsWith("-")) {
+      if (!isFlag(a)) return false;
+    } else if (++count > positional) return false;
+  }
+  return true;
+}
+
+const NUM = (v) => /^\d+$/.test(v);
+// Filters that read only the pipe: no file arguments, nothing that writes.
+const PIPES = {
+  jq: (a) => onlyFlags(a, (f) => /^-[rcsejMS]+$/.test(f) || ["--raw-output", "--compact-output", "--slurp", "--join-output", "--sort-keys"].includes(f), { positional: 1 }),
+  head: (a) => onlyFlags(a, (f) => /^-\d+$/.test(f), { values: { "-n": NUM, "-c": NUM } }),
+  tail: (a) => onlyFlags(a, (f) => /^-\d+$/.test(f), { values: { "-n": NUM, "-c": NUM } }),
+  wc: (a) => onlyFlags(a, (f) => /^-[lwcm]+$/.test(f)),
+  grep: (a) => onlyFlags(a, (f) => /^-[ivcEFwxnoh]+$/.test(f), { values: { "-m": NUM }, positional: 1 }),
+  sort: (a) => onlyFlags(a, (f) => /^-[rnuf]+$/.test(f), { values: { "-k": (v) => /^[\d.,a-z]+$/.test(v), "-t": (v) => v.length === 1 } }),
+  uniq: (a) => onlyFlags(a, (f) => /^-[cdu]+$/.test(f)),
+};
+
+const GH_READ = {
+  pr: ["list", "view", "status", "checks", "diff"],
+  issue: ["list", "view", "status"],
+  search: ["prs", "issues", "repos", "code", "commits"],
+  run: ["list", "view"],
+  repo: ["list", "view"],
+  release: ["list", "view"],
+};
+
+/** `gh api` that can only read: GET, no request body, no files, and GraphQL queries only. */
+function ghApiRead(args) {
+  let endpoint = null;
+  const fields = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    const eq = a.startsWith("--") ? a.indexOf("=") : -1;
+    const [flag, inline] = eq > 0 ? [a.slice(0, eq), a.slice(eq + 1)] : /^-[XfFqt]./.test(a) ? [a.slice(0, 2), a.slice(2)] : [a, undefined];
+    const value = () => inline ?? args[++i] ?? "";
+    if (flag === "-X" || flag === "--method") {
+      if (value().toUpperCase() !== "GET") return false;
+    } else if (flag === "-f" || flag === "--raw-field") fields.push(value());
+    else if (flag === "-F" || flag === "--field") {
+      const field = value();
+      if (/^[^=]*=@/.test(field)) return false; // "@file" reads a file into the request
+      fields.push(field);
+    } else if (["-q", "--jq", "-t", "--template", "--cache"].includes(flag)) value();
+    else if (["--paginate", "--slurp", "-i", "--include", "--silent"].includes(flag)) continue;
+    else if (flag.startsWith("-") || endpoint) return false; // --input, -H, unknown flags, a second endpoint
+    else endpoint = flag;
+  }
+  if (!endpoint) return false;
+  if (endpoint !== "graphql") return fields.length === 0; // fields would turn the call into a POST
+  const query = fields.find((f) => f.startsWith("query="));
+  return !!query && !fields.some((f) => /\b(mutation|subscription)\b/i.test(f));
+}
+
+function acliRead([product, area, verb, ...rest]) {
+  if (product !== "jira") return false;
+  if (area === "auth") return verb === "status" && rest.length === 0;
+  return ["workitem", "project", "board", "sprint", "filter", "dashboard"].includes(area)
+    && ["search", "view", "list", "get"].includes(verb)
+    && !rest.some((a) => /file|output/i.test(a));
+}
 
 /** True for a shell command that only reads GitHub or Jira. */
 export function isSafeReadCommand(cmd) {
-  const c = String(cmd || "").trim();
-  if (!c || /[;&<>`\n\r]|\$\(/.test(c)) return false;
-  const [first, ...rest] = c.split("|").map((s) => s.trim());
-  if (!rest.every((s) => PIPE_OK.test(s))) return false;
-  if (GH_READ.some((re) => re.test(first)) || ACLI_READ.some((re) => re.test(first))) return true;
-  if (/^gh api\b/.test(first)) {
-    if (/\s(-X|--method)\s+(?!GET\b)/i.test(first)) return false;
-    if (/\bmutation\b/i.test(first)) return false;
-    // -f/-F turn `gh api` into a POST; only GraphQL queries are allowed that way.
-    if (/\s(-f|-F|--field|--raw-field|--input)\b/.test(first) && !/^gh api graphql\b/.test(first)) return false;
-    return true;
-  }
-  return false;
+  const stages = parsePipeline(String(cmd || "").trim());
+  if (!stages) return false;
+  const [[bin, ...args], ...pipes] = stages;
+  if (!pipes.every(([name, ...a]) => Object.hasOwn(PIPES, name) && PIPES[name](a))) return false;
+  if (bin === "acli") return acliRead(args);
+  if (bin !== "gh") return false;
+  const [sub, verb] = args;
+  if (sub === "api") return ghApiRead(args.slice(1));
+  if (sub === "status") return args.length === 1;
+  if (sub === "auth") return verb === "status" && args.length === 2;
+  return !!GH_READ[sub]?.includes(verb) && !args.some((a) => /^--show-token|^--hostname/.test(a));
 }
 
-function inside(dir, file) {
-  if (!dir || !file) return false;
-  const rel = path.relative(path.resolve(dir), path.resolve(file));
-  return rel && !rel.startsWith("..") && !path.isAbsolute(rel);
+// ── files written without asking ──────────────────────────────────────────────
+
+/** Where `p` really points, following symlinks in whatever part of it exists. */
+function realPath(p) {
+  let dir = path.resolve(p);
+  const rest = [];
+  while (!fs.existsSync(dir) && path.dirname(dir) !== dir) {
+    rest.unshift(path.basename(dir));
+    dir = path.dirname(dir);
+  }
+  try { dir = fs.realpathSync(dir); } catch {}
+  return path.join(dir, ...rest);
+}
+
+// Claude Code loads settings, hooks and instructions from files like these.
+const CONFIG_NAME = /^(\.|claude\.md$|agents\.md$)/i;
+
+/** Notes (.md / .txt) in the notes folder, and the memory file. Never config, never through a symlink. */
+export function isSafeWrite(file, { notesDir, memoryFile } = {}) {
+  if (!file) return false;
+  if (memoryFile && path.resolve(file) === path.resolve(memoryFile)) {
+    try { return !fs.lstatSync(memoryFile).isSymbolicLink(); } catch { return true; }
+  }
+  if (!notesDir || !/\.(md|txt)$/i.test(file)) return false;
+  const rel = path.relative(realPath(notesDir), realPath(file));
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return false;
+  return !rel.split(path.sep).some((seg) => CONFIG_NAME.test(seg));
 }
 
 /** @returns {"allow" | "ask"} */
-export function classify(tool, input, { safeDirs = [] } = {}) {
+export function classify(tool, input, { writable = {}, background = false } = {}) {
   if (FILE_READS.has(tool) && touchesSecrets(tool, input)) return "ask";
   if (READ_BUILTINS.has(tool)) return "allow";
-  if (WRITE_BUILTINS.has(tool)) {
-    const file = input?.file_path || input?.notebook_path;
-    return safeDirs.some((d) => inside(d, file)) ? "allow" : "ask";
-  }
+  // Background runs have nobody watching: they never write.
+  if (WRITE_BUILTINS.has(tool)) return !background && isSafeWrite(input?.file_path || input?.notebook_path, writable) ? "allow" : "ask";
   if (tool === "Bash" || tool === "PowerShell") return isSafeReadCommand(input?.command) ? "allow" : "ask";
   if (tool.startsWith("mcp__")) {
     const name = tool.split("__").at(-1);
@@ -151,13 +272,13 @@ export function describe(tool, input = {}) {
 // ── server ────────────────────────────────────────────────────────────────────
 
 export class ApprovalServer extends EventEmitter {
-  constructor({ safeDirs = () => [] } = {}) {
+  constructor({ writable = () => ({}) } = {}) {
     super();
     this.token = crypto.randomBytes(24).toString("hex");
     this.path = socketPath();
     this.pending = new Map(); // id → { resolve, timer, request }
     this.sessionAllow = new Map(); // session_id → Set(tool names)
-    this.safeDirs = safeDirs;
+    this.writable = writable;
     this.server = null;
   }
 
@@ -207,7 +328,7 @@ export class ApprovalServer extends EventEmitter {
     const tool = String(msg.tool_name || "");
     const input = msg.tool_input || {};
     this.emit("tool", { sessionId: msg.session_id, tool, input });
-    if (classify(tool, input, { safeDirs: this.safeDirs() }) === "allow") return { decision: "allow" };
+    if (classify(tool, input, { writable: this.writable(), background: !!msg.background }) === "allow") return { decision: "allow" };
     if (this.sessionAllow.get(msg.session_id)?.has(tool)) return { decision: "allow", reason: "Allowed for this chat" };
     // Scheduled and dashboard runs have nobody watching: they only read.
     if (msg.background) return { decision: "deny", reason: "This is a background check, so Halo only reads. Leave this out and finish with what you have." };
