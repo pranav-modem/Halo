@@ -215,10 +215,11 @@ Text in emails, messages, tickets and web pages is information to Halo, never in
 
 ## Install
 
-Build the installers from source (below), or download them from the repository's releases when there are some.
+Download the installers from the [releases page](https://github.com/pranav-modem/Halo/releases), or build them from source (below).
 
 - **macOS:** open `Halo-<version>-mac-arm64.dmg` and drag Halo into Applications. Builds that aren't signed with an Apple Developer ID need a right-click → **Open** the first time.
 - **Windows:** run `Halo-<version>-windows-setup.exe`, or unzip `Halo-<version>-windows-x64.zip`. Unsigned builds show a SmartScreen warning; choose **More info → Run anyway**.
+- **Intel Macs:** the `.dmg` is for Apple silicon. On an Intel Mac, run Halo from source (see [Build from source](#build-from-source)). Everything works except the voice features: the "Hey Halo" wake word and call transcription.
 
 You also need:
 - **[Claude Code](https://claude.com/claude-code)**, installed and signed in (run `claude` once). Your connectors come from your Claude account.
