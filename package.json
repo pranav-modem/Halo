@@ -53,6 +53,7 @@
     "files": [
       "src/**/*",
       "assets/**/*",
+      "models/**/*",
       "package.json",
       "!src/renderer/gallery.*",
       "!src/renderer/icon-render.*",
@@ -62,7 +63,8 @@
       "src/hook/**",
       "node_modules/onnxruntime-node/**",
       "node_modules/sharp/**",
-      "node_modules/@img/**"
+      "node_modules/@img/**",
+      "models/**"
     ],
     "mac": {
       "target": [

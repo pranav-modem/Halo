@@ -776,14 +776,14 @@ PAGES.voice = (root) => {
     label("Wake word"),
     card(
       setRow(`Listen for “Hey Halo” or “Hey ${S.characters.find((c) => c.id === S.settings.character)?.name ?? "Nova"}”`, "Halo listens on this computer with a tiny speech model and only reacts to the wake phrase. Say the request right after it, or wait for the chime. Say “Hey Halo, stop listening” to turn this off; it stays off until you turn it back on here, with the mic button in Halo's window, or from the menu.", toggle(S.settings.wakeWord?.enabled, (v) => save({ wakeWord: { enabled: v } }))),
-      setRow("Wake word model", "Accurate hears “Halo” much more reliably. Fast uses less of your computer.", select(S.settings.wakeWord?.model, [["onnx-community/whisper-base.en", "Accurate (recommended)"], ["onnx-community/whisper-tiny.en", "Fast"]], (v) => save({ wakeWord: { model: v, modelChosen: true } }))),
+      setRow("Wake word model", "Accurate hears “Halo” much more reliably. Fast uses less of your computer.", select(S.settings.wakeWord?.model, [["onnx-community/whisper-base.en", "Accurate (built in)"], ["onnx-community/whisper-tiny.en", "Fast (42 MB download)"]], (v) => save({ wakeWord: { model: v, modelChosen: true } }))),
       setRow("Read answers aloud", "When you ask by voice, Halo says the first lines of its answer. Press Stop to hush it.", toggle(S.settings.wakeWord?.speakReplies, (v) => save({ wakeWord: { speakReplies: v } }))),
     ),
     label("Transcription"),
     card(
       setRow("Transcription", null, seg(t.engine, [["local", "On this computer"], ["openai-compatible", "A speech-to-text service"]], (v) => save({ transcription: { engine: v } }).then(render))),
       ...(t.engine === "local"
-        ? [setRow("Speech model", "Downloads once, then works offline.", select(t.localModel, [["onnx-community/whisper-tiny", "Whisper Tiny (fastest)"], ["onnx-community/whisper-base", "Whisper Base"], ["onnx-community/whisper-small", "Whisper Small (best)"]], (v) => save({ transcription: { localModel: v } })), h("button", { class: "btn small", onclick: () => api.send("notes:warmup") }, "Download now"))]
+        ? [setRow("Speech model", "English works out of the box. Other languages download once, then work offline.", select(t.localModel, [["onnx-community/whisper-base.en", "English (built in)"], ["onnx-community/whisper-base", "Any language (76 MB download)"], ["onnx-community/whisper-small", "Any language, most accurate (larger download)"]], (v) => save({ transcription: { localModel: v, modelChosen: true } })), h("button", { class: "btn small", onclick: () => api.send("notes:warmup") }, "Download now"))]
         : [
             setRow("Service URL", "Any OpenAI-compatible /audio/transcriptions endpoint.", textInput(t.baseUrl, (v) => save({ transcription: { baseUrl: v } }))),
             setRow("Model", null, textInput(t.model, (v) => save({ transcription: { model: v } }))),

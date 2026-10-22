@@ -1,8 +1,7 @@
 // Runs in an Electron utility process so transcription never blocks the app.
 // Whisper via transformers.js on onnxruntime-node: everything stays on this
-// computer. Models download once into the app's data folder. Several models
-// can be loaded at once (a tiny one for the wake word, a bigger one for notes);
-// each model transcribes one thing at a time.
+// computer. The English model ships with Halo (models/); others download once
+// into the app's data folder. Each model transcribes one thing at a time.
 
 import { env, pipeline } from "@huggingface/transformers";
 
@@ -52,8 +51,9 @@ async function transcribe(msg) {
 process.parentPort.on("message", async (e) => {
   const msg = e.data;
   if (msg.type === "init") {
-    env.cacheDir = msg.cacheDir;
-    env.allowLocalModels = false;
+    env.localModelPath = msg.localModels; // the models that ship with Halo
+    env.allowLocalModels = true;
+    env.cacheDir = msg.cacheDir; // anything else, downloaded once
     return;
   }
   if (msg.type === "warmup") {

@@ -13,6 +13,8 @@ HALO_DEBUG=1 npm start
 
 You need Claude Code installed and signed in. `gh` and `acli` are only needed for the GitHub and Jira parts.
 
+`HALO_PROFILE=/tmp/halo-test npm start` runs a separate, fresh copy with its own settings, so you can test a first launch without touching your own Halo.
+
 ## Making a change
 
 1. Open an issue first for anything bigger than a small fix, so we can agree on the approach.
@@ -28,6 +30,7 @@ If you touch windows, screen capture or audio, say which platforms you tested on
 - Plain ES modules and the DOM; no UI framework. Pages build elements with the small `h()` helper in `src/renderer/ui/common.js`.
 - Keep comments short, and about why, not what.
 - Add a dependency only after talking it through in an issue.
+- `models/` holds the built-in speech model. Don't add more models: GitHub refuses files over 100 MB, and every clone downloads them. Other models download on demand.
 - Pages reach the main process only through `src/preload/preload.cjs`. A new IPC prefix has to be added to `ALLOWED` there, or the page fails when it loads.
 - Colours come from the CSS variables, so day and night both work. Avoid pure black and pure white.
 

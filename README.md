@@ -88,7 +88,7 @@ Screenshots come with quick follow-ups: *Explain*, *Summarize*, *Draft a reply*,
 
 ### Talk to it
 
-- **“Hey Halo”** or your character's name (*“OK Nova”*) wakes it. Recognition runs on your computer with a small Whisper model, and only the words after the wake phrase go to Claude, never audio.
+- **“Hey Halo”** or your character's name (*“OK Nova”*) wakes it. Recognition runs on your computer with a small Whisper model that ships with Halo, so it works from the first launch, offline. Only the words after the wake phrase go to Claude, never audio.
 - **Conversations keep going.** After Halo answers out loud, just reply. It listens for about 8 seconds more, and it ignores its own voice coming back through the speakers.
 - **Hush it** with *“Hey Halo, stop”*, Esc, the Stop button, or by starting to type.
 - **“Hey Halo, stop listening”** turns the wake word off until you turn it back on: the mic button in the chat header, the menu, or Settings.
@@ -99,7 +99,7 @@ Screenshots come with quick follow-ups: *Explain*, *Summarize*, *Draft a reply*,
 Halo notices Zoom, Teams, Google Meet, Webex, Slack huddles and FaceTime calls and offers to take notes. It never starts on its own. Tell the people on the call that you're taking notes.
 
 - **You and Them:** your microphone and the call's audio are recorded separately, so the transcript knows who said what.
-- **On your computer:** Whisper transcribes the audio locally. The audio is deleted once the notes are written, and kept until then so a failed part can be retried.
+- **On your computer:** Whisper transcribes the audio locally, in English out of the box. Other languages download once from Settings → Notes and voice. The audio is deleted once the notes are written, and kept until then so a failed part can be retried.
 - **Two passes by Claude:** the first fixes misheard words without rephrasing anything. The second writes a title, a summary, key points and to-dos, marking which ones are yours.
 - **Editable afterwards:** in the room's **Calls** page you can rename a speaker (giving two speakers the same name merges them), move a line to whoever really said it, rewrite it or delete it.
 - **Follow-ups**, each one still asking for your OK: make Jira tickets from the action items, add To-Dos to Ninety, post the summary to Slack.
@@ -225,7 +225,7 @@ Quit and reopen Halo after you allow screen recording.
 
 ## Build from source
 
-You need Node 22 or later.
+You need Node 22 or later. The clone includes Halo's built-in English speech model (about 76 MB), so nothing downloads when Halo first listens.
 
 ```bash
 git clone https://github.com/pranav-modem/Halo.git
@@ -238,6 +238,7 @@ npm start
 |---|---|
 | `npm start` | Run Halo from source |
 | `HALO_DEBUG=1 npm start` | Also print every window's console to the terminal |
+| `HALO_PROFILE=/tmp/halo-test npm start` | Run a separate, fresh copy with its own settings, next to your own Halo |
 | `npm run check` | Syntax-check every source file |
 | `npm run gallery` | Every character in every state, at `localhost:5180/renderer/gallery.html` |
 | `npm run icons` | Re-render the app and tray icons from the characters |
@@ -245,6 +246,19 @@ npm start
 | `npm run dist:win` | Build the Windows installer and zip into `dist/` |
 
 On macOS, `npm run dist:mac` signs with your Apple Development or Developer ID certificate when it finds one, so permissions survive reinstalls. `scripts/make-signing-cert.sh` creates a local signing certificate if you have neither.
+
+## Troubleshooting
+
+**Halo doesn't hear me.** Halo shows a note in the chat and a bubble when the microphone is blocked.
+- **macOS, installed app:** turn on Halo in System Settings → Privacy & Security → Microphone, then reopen Halo.
+- **macOS, run from source** (`npm start`): macOS asks on behalf of your terminal app (Terminal, iTerm or VS Code), so turn on *that* app in the same place, then restart Halo.
+- **Windows:** turn on *Let desktop apps access your microphone* in Settings → Privacy & security → Microphone.
+
+**“Hey Halo” doesn't wake it.** Check that **Listen for “Hey Halo”** is on (Settings → Notes and voice, or the menu). Saying *“Hey Halo, stop listening”* turns it off until you turn it back on.
+
+**Halo can't look at a window.** On macOS, allow **Screen & System Audio Recording** for Halo (or your terminal app when running from source), then reopen it.
+
+**Settings → Integrations** shows what's ready: Claude Code, each connector, `gh`, `acli` and the macOS permissions.
 
 ## Where things live
 
@@ -257,7 +271,7 @@ On macOS, `npm run dist:mac` signs with your Apple Development or Developer ID c
 App data: ~/Library/Application Support/Halo on macOS, %APPDATA%\Halo on Windows
   settings.json                   your settings, pieces, recent chats and call log
   secrets.json                    API keys, encrypted with the system keychain
-  models/                         the on-device speech models
+  models/                         extra speech models you download (other languages)
   notes-audio/                    meeting audio, kept only until the notes are written
 ```
 
@@ -277,6 +291,7 @@ src/
   shared/          the characters' names, shapes and personalities
 scripts/           checks, icon rendering, packaging and signing
 assets/            app and tray icons, and a still of each character
+models/            the built-in English speech model, with its license
 ```
 
 ## Contributing

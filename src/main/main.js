@@ -27,6 +27,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, "..", "..");
 const isMac = process.platform === "darwin";
 
+// HALO_PROFILE=<folder>: a separate copy with its own settings and data (for development).
+if (process.env.HALO_PROFILE) app.setPath("userData", path.resolve(process.env.HALO_PROFILE));
 if (!app.requestSingleInstanceLock()) app.quit();
 
 // System audio for the notetaker on macOS is best effort (Windows supports it natively).
@@ -209,6 +211,8 @@ app.whenReady().then(async () => {
   });
 
   transcriber = new Transcriber(store);
+  // Have the wake word's model loaded before the first "Hey Halo".
+  if (store.get("wakeWord.enabled")) setTimeout(() => transcriber.warmup(store.get("wakeWord.model")), 1500);
   notes = new Notes({ store, chat, transcriber });
   watcher = new Watcher({ store, chat, githubToken: () => ghToken, jiraSite: () => store.get("jiraSite") });
   pieces = new Pieces({ store, chat });
@@ -549,6 +553,15 @@ function setWakeWord(on, { byVoice = false } = {}) {
   }
 }
 
+let micWarned = false;
+
+/** How to turn the microphone on, for this platform and this way of running Halo. */
+function micHelp() {
+  if (!isMac) return "Halo can't use the microphone. Turn on “Let desktop apps access your microphone” in Settings → Privacy & security → Microphone.";
+  if (!app.isPackaged) return "Halo can't use the microphone. Running from a terminal, macOS asks on behalf of that app (Terminal, iTerm or VS Code): turn it on in System Settings → Privacy & Security → Microphone, then restart Halo.";
+  return "Halo can't use the microphone. Turn on Halo in System Settings → Privacy & Security → Microphone, then reopen Halo.";
+}
+
 /** "Follow my pointer" on or off: the menu, Settings → General, or "stop following me" in the chat or out loud. */
 function setFollowPointer(on) {
   store.set("followPointer", !!on);
@@ -848,6 +861,13 @@ function wireIpc() {
     return settingsPayload();
   });
   ipcMain.on("settings:openScreenSettings", () => openScreenSettings());
+  ipcMain.on("settings:openMicSettings", () => shell.openExternal(isMac ? "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" : "ms-settings:privacy-microphone"));
+  ipcMain.handle("notes:micHelp", () => micHelp());
+  ipcMain.on("notes:micDenied", () => {
+    if (micWarned) return;
+    micWarned = true;
+    bubble({ title: "I can't hear you", body: "Microphone access is off. Open my chat to see how to turn it on.", kind: "alert", action: { tab: "chat" }, timeoutMs: 12000 });
+  });
   ipcMain.handle("settings:detectTimeZone", async () => {
     try {
       return { ok: true, value: await chat.detectAccountTimeZone({ force: true }) };

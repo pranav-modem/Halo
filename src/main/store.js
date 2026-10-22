@@ -47,7 +47,7 @@ const DEFAULTS = {
 
   transcription: {
     engine: "local", // local | openai-compatible
-    localModel: "onnx-community/whisper-base",
+    localModel: "onnx-community/whisper-base.en", // ships with Halo; other languages download
     baseUrl: "https://api.openai.com/v1",
     model: "whisper-1",
   },
@@ -84,6 +84,8 @@ export class Store {
     this.data = deepMerge(DEFAULTS, readJson(this.file));
     // Day is Halo's default look; earlier builds saved "system" before you'd chosen anything.
     if (!this.data.themeChosen && this.data.theme === "system") this.data.theme = "light";
+    // Earlier builds defaulted to the multilingual model, which had to download first.
+    if (this.data.transcription?.localModel === "onnx-community/whisper-base" && !this.data.transcription.modelChosen) this.data.transcription.localModel = DEFAULTS.transcription.localModel;
     // Earlier builds saved the tiny wake model, which mishears "Halo".
     if (this.data.wakeWord?.model === "onnx-community/whisper-tiny.en" && !this.data.wakeWord.modelChosen) this.data.wakeWord.model = DEFAULTS.wakeWord.model;
     this.secrets = readJson(this.secretsFile) ?? {};

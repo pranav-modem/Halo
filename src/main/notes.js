@@ -31,7 +31,13 @@ export class Transcriber extends EventEmitter {
     if (this.proc) return;
     const worker = path.join(here, "transcriber-worker.mjs");
     this.proc = utilityProcess.fork(worker, [], { serviceName: "Halo Transcriber", stdio: "pipe" });
-    this.proc.postMessage({ type: "init", cacheDir: path.join(app.getPath("userData"), "models") });
+    // Drain its output: a full pipe would stall the worker.
+    for (const stream of [this.proc.stdout, this.proc.stderr]) stream?.on("data", (d) => process.env.HALO_DEBUG && process.stdout.write(`[transcriber] ${d}`));
+    this.proc.postMessage({
+      type: "init",
+      localModels: path.join(here, "..", "..", "models").replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`),
+      cacheDir: path.join(app.getPath("userData"), "models"),
+    });
     this.proc.on("message", (m) => {
       if (m.type === "progress") this.emit("progress", m);
       else if (m.type === "ready") this.emit("ready", m);
@@ -51,10 +57,11 @@ export class Transcriber extends EventEmitter {
     });
   }
 
-  warmup() {
-    if (this.store.get("transcription.engine") !== "local") return;
+  /** Loads a model ahead of time (the notes model unless one is named). */
+  warmup(model) {
+    if (!model && this.store.get("transcription.engine") !== "local") return;
     this.ensure();
-    this.proc.postMessage({ type: "warmup", model: this.store.get("transcription.localModel") });
+    this.proc.postMessage({ type: "warmup", model: model || this.store.get("transcription.localModel") });
   }
 
   /** Plain text (dictation, the wake word). @param {{pcm?: Float32Array, audio?: Buffer, mime?: string, model?: string}} seg */

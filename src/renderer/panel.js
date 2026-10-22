@@ -591,14 +591,23 @@ api.on("chat:attach", (img) => {
 });
 document.querySelectorAll("[data-shot]").forEach((b) => b.addEventListener("click", () => send(b.dataset.shot)));
 
-api.on("chat:notice", (n) => {
+function showNotice(n, { open = true } = {}) {
   const box = $("notice");
   box.replaceChildren(h("span", { class: "grow" }, n.text));
-  if (n.kind === "permission") box.append(h("button", { class: "pill", onclick: () => api.send("settings:openScreenSettings") }, "Open Settings"));
+  const settings = { permission: "settings:openScreenSettings", mic: "settings:openMicSettings" }[n.kind];
+  if (settings) box.append(h("button", { class: "pill", onclick: () => api.send(settings) }, "Open Settings"));
   box.append(h("button", { class: "hicon sm", "aria-label": "Dismiss", onclick: () => (box.hidden = true), html: ICON.close }));
   box.hidden = false;
-  show("chat");
-});
+  if (open) show("chat");
+}
+api.on("chat:notice", (n) => showNotice(n));
+
+/** The microphone is blocked: say so and how to fix it, instead of failing quietly. */
+async function micDenied({ open = true } = {}) {
+  showNotice({ text: await api.invoke("notes:micHelp"), kind: "mic" }, { open });
+  api.send("notes:micDenied");
+}
+const blocked = (e) => ["NotAllowedError", "SecurityError"].includes(e?.name);
 
 function showUsage(info) {
   if (!info) return;
@@ -669,8 +678,9 @@ async function startDictation({ reply = false } = {}) {
   if (dict || micBtn.classList.contains("busy")) return;
   show("chat");
   if (!(await api.invoke("notes:micAccess"))) {
-    input.placeholder = "Microphone access is off. Turn it on in System Settings → Privacy & Security.";
+    input.placeholder = "Microphone access is off.";
     endConversation();
+    micDenied();
     return;
   }
   let stream;
@@ -679,6 +689,7 @@ async function startDictation({ reply = false } = {}) {
   } catch (e) {
     input.placeholder = `Couldn't use the microphone: ${e.message}`;
     endConversation();
+    if (blocked(e)) micDenied();
     return;
   }
   const chunks = [];
@@ -884,7 +895,7 @@ async function setupWake() {
   }
   if (wake) return;
   if (!(await api.invoke("notes:micAccess"))) {
-    console.warn("[wake] no microphone access");
+    micDenied({ open: false });
     return;
   }
   wake = new WakeWord({
@@ -924,6 +935,7 @@ async function setupWake() {
   } catch (err) {
     console.warn("[wake] couldn't start the microphone:", err?.message ?? err);
     wake = null;
+    if (blocked(err)) micDenied({ open: false });
   }
 }
 
@@ -1067,7 +1079,7 @@ function setRecUi(on) {
 }
 async function startRecording() {
   if (recorder) return;
-  if (!(await api.invoke("notes:micAccess"))) { $("rec-hint").textContent = "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone."; return; }
+  if (!(await api.invoke("notes:micAccess"))) { $("rec-hint").textContent = "Microphone access is off."; micDenied(); return; }
   const title = $("rec-title").value.trim() || `Meeting ${new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`;
   recSession = await api.invoke("notes:start", { title });
   $("live-transcript").replaceChildren();
