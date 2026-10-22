@@ -28,6 +28,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, "..", "..");
 const isMac = process.platform === "darwin";
 
+// Logging to a terminal that has since closed must never crash Halo.
+for (const stream of [process.stdout, process.stderr]) stream.on("error", () => {});
+
 // HALO_PROFILE=<folder>: a separate copy with its own settings and data (for development).
 if (process.env.HALO_PROFILE) app.setPath("userData", path.resolve(process.env.HALO_PROFILE));
 if (!app.requestSingleInstanceLock()) app.quit();

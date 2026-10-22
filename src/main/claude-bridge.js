@@ -125,17 +125,21 @@ export class ClaudeSession extends EventEmitter {
     });
     proc.stderr.setEncoding("utf8");
     proc.stderr.on("data", (d) => { this.stderr = (this.stderr + d).slice(-4000); });
+    // A write that lands after the process has gone fails with EPIPE; "exit" says what happened.
+    proc.stdin.on("error", () => {});
     proc.on("error", (err) => {
+      if (this.proc === proc) this.proc = null;
+      this.busy = false;
       this.emit("fatal", { message: `Couldn't start Claude Code: ${err.message}` });
     });
     proc.on("exit", (code, signal) => {
-      if (this.proc === proc) this.proc = null;
+      if (this.proc !== proc) return; // one we already let go of (stopped, idle or closing)
+      this.proc = null;
       if (this.sessionId) this.resumeNext = true;
       if (this.busy) {
         this.busy = false;
-        if (!this.stopping) this.emit("fatal", { message: this.explainExit(code) });
+        this.emit("fatal", { message: this.explainExit(code) });
       }
-      this.stopping = false;
       this.emit("exit", { code, signal });
     });
   }
@@ -220,6 +224,7 @@ export class ClaudeSession extends EventEmitter {
 
   /** @param {Array<object>} content Anthropic content blocks (text / image). */
   send(content) {
+    if (this.proc && !this.proc.stdin.writable) this.release(); // on its way out: start a fresh one
     this.ensure();
     clearTimeout(this.idleTimer);
     this.busy = true;
@@ -230,29 +235,31 @@ export class ClaudeSession extends EventEmitter {
   /** Stops the current answer. The next message resumes the same conversation. */
   stop() {
     if (!this.proc) return;
-    this.stopping = true;
     this.busy = false;
-    this.proc.kill();
+    this.release();
     this.emit("stopped");
+  }
+
+  /** Lets the process go at once; the next message starts a fresh one that resumes the conversation. */
+  release() {
+    const proc = this.proc;
+    if (!proc) return;
+    this.proc = null;
+    if (this.sessionId) this.resumeNext = true;
+    proc.kill();
   }
 
   armIdle() {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {
-      if (this.proc && !this.busy) {
-        this.stopping = true;
-        this.proc.kill();
-      }
+      if (this.proc && !this.busy) this.release();
     }, IDLE_KILL_MS);
   }
 
   dispose() {
     clearTimeout(this.idleTimer);
     this.removeAllListeners();
-    if (this.proc) {
-      this.stopping = true;
-      this.proc.kill();
-    }
+    this.release();
   }
 }
 
@@ -269,6 +276,7 @@ export async function runStructured({ bin, cwd, env, args, prompt, schema, timeo
     const timer = setTimeout(() => { proc.kill(); reject(new Error("Claude Code took too long.")); }, timeoutMs);
     proc.stdout.on("data", (d) => (out += d));
     proc.stderr.on("data", (d) => (err = (err + d).slice(-4000)));
+    proc.stdin.on("error", () => {});
     proc.stdin.end();
     proc.on("error", (e) => { clearTimeout(timer); reject(e); });
     proc.on("exit", (code) => {

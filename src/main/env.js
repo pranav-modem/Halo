@@ -67,6 +67,7 @@ export function run(cmd, args, { env, timeout = 30000, input } = {}) {
       (err, stdout, stderr) => resolve({ ok: !err, code: err?.code ?? 0, stdout: String(stdout), stderr: String(stderr), error: err }),
     );
     if (input != null) {
+      child.stdin.on("error", () => {}); // the command may exit before reading it all
       child.stdin.end(input);
     }
   });
