@@ -136,6 +136,13 @@ Add your own in the room: a name, a time (*every 30m*, *every 2h*, or *at 16:30 
 
 ### Recap
 
+**You and your agents:** today, this week or last week with Claude Code, counted on your computer from Claude Code's own transcripts:
+- time spent and sessions;
+- lines changed, files edited and commands run;
+- your busiest day and top project.
+
+Scripted runs are left out. **Share as an image** makes a 1080 × 1920 picture with your character on it, to save or copy.
+
 What you got done today or this week:
 - **The numbers** come from Halo: chats, calls and minutes, notes written, and things marked Done.
 - **The written recap** reads GitHub, Jira, Ninety, Slack, your calendar and your meeting notes.

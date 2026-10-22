@@ -1,7 +1,8 @@
 // Halo: app start-up and wiring between the companion, the panel, Claude
 // Code, approvals, screen capture, Today data and meeting notes.
 
-import { app, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, systemPreferences, Tray, desktopCapturer } from "electron";
+import { app, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, session, shell, systemPreferences, Tray, desktopCapturer, utilityProcess } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHARACTERS, characterById } from "../shared/characters-meta.js";
@@ -18,7 +19,7 @@ import { CompanionWindow, CHAR, IslandWindow, PanelWindow, RoomWindow } from "./
 import { listHistory, listSkills, Memory, readHistory, skillsHelp } from "./library.js";
 import { Pieces } from "./pieces.js";
 import { CallWatcher } from "./calls.js";
-import { latestRecap, recapStats, writeRecap } from "./recap.js";
+import { latestRecap, periodRange, recapStats, writeRecap } from "./recap.js";
 import { SessionWatcher, sessionTurns } from "./sessions.js";
 import { CcPermissionServer } from "./cc-permissions.js";
 import { applyPlan, cancelPlan, hookStatus, planHooks } from "./cc-settings.js";
@@ -562,6 +563,24 @@ function micHelp() {
   return "Halo can't use the microphone. Turn on Halo in System Settings → Privacy & Security → Microphone, then reopen Halo.";
 }
 
+// Your time with your agents, counted in a background process (a week of transcripts takes seconds).
+const agentCache = new Map(); // period → { at, result }
+function agentRecap(period) {
+  const hit = agentCache.get(period);
+  if (hit && Date.now() - hit.at < 3 * 60_000) return hit.result;
+  const result = new Promise((resolve) => {
+    const child = utilityProcess.fork(path.join(here, "agent-recap-worker.mjs"), [], { serviceName: "Halo Recap", stdio: "ignore" });
+    child.once("message", (m) => {
+      resolve(m);
+      child.kill();
+    });
+    child.once("exit", () => resolve({ ok: false, error: "Counting stopped before it finished." }));
+    child.postMessage({ ...periodRange(period), exclude: [store.get("workspaceDir")] });
+  });
+  agentCache.set(period, { at: Date.now(), result });
+  return result;
+}
+
 /** "Follow my pointer" on or off: the menu, Settings → General, or "stop following me" in the chat or out loud. */
 function setFollowPointer(on) {
   store.set("followPointer", !!on);
@@ -706,6 +725,20 @@ function wireIpc() {
     return store.get("calls");
   });
   ipcMain.on("calls:takeNotes", () => calls.active && startCallNotes(calls.active));
+  ipcMain.handle("recap:agents", (_e, period) => agentRecap(String(period)));
+  ipcMain.handle("recap:saveImage", (_e, { dataUrl, name }) => {
+    const png = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl));
+    if (!png) return { ok: false, error: "Not a PNG." };
+    const dir = path.join(store.get("workspaceDir"), "Recaps");
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `${String(name).replace(/[^\w .–-]+/g, "").trim() || "Recap"}.png`);
+    fs.writeFileSync(file, Buffer.from(png[1], "base64"));
+    return { ok: true, file };
+  });
+  ipcMain.on("recap:showFile", (_e, file) => {
+    const dir = path.join(store.get("workspaceDir"), "Recaps");
+    if (path.dirname(path.resolve(String(file))) === path.resolve(dir)) shell.showItemInFolder(file);
+  });
   ipcMain.handle("recap:get", (_e, period) => ({
     stats: recapStats({ store, notesList: notes.list(""), historyList: listHistory(store), period }),
     latest: latestRecap(store, period),

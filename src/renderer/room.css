@@ -230,3 +230,8 @@ h1.title { font-size: 22px; font-weight: 650; margin: 4px 0 0; }
   .review .diff .del { background: rgba(244,80,94,.12); color: #991B1B; }
   .review .diff .hunk { color: var(--accent); }
 }
+
+/* Recap picture */
+.share { display: flex; gap: 22px; align-items: flex-start; padding: 18px; }
+.share img { width: 216px; border-radius: 14px; box-shadow: 0 10px 30px rgba(40,20,120,.35); }
+.share-actions { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }

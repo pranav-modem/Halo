@@ -3,6 +3,7 @@
 
 import { Character } from "./characters/engine.js";
 import { renderMarkdown } from "./markdown.js";
+import { hm, num, recapImage, recapTitle } from "./recap-image.js";
 import { $, ago, api, h, ICON, isMac, mark, openUrl } from "./ui/common.js";
 
 for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = ICON[el.dataset.icon] ?? "";
@@ -598,11 +599,59 @@ PAGES.recap = async (root) => {
         stat("Notes written", String(stats.notes), "meetings and quick notes"),
         stat("Things handled", String(stats.handled), "marked Done"),
       ),
+      agents,
       out,
     );
     if (latest) out.replaceChildren(h("div", { class: "note-view" }, h("div", { class: "text", html: renderMarkdown(latest.markdown) })));
   };
+
+  // You and your agents: counted from Claude Code's own transcripts, shareable as a picture.
+  const agents = h("div", { class: "cc-box" });
+  let agentPeriod = PAGES.recap.agentPeriod ?? "week";
+  const drawAgents = async () => {
+    const picker = seg(agentPeriod, [["day", "Today"], ["week", "This week"], ["lastweek", "Last week"]], (v) => { agentPeriod = v; PAGES.recap.agentPeriod = v; drawAgents(); });
+    agents.replaceChildren(label("You and your agents"), picker, card(h("div", { class: "empty" }, h("span", {}, "Counting your Claude Code sessions…"))));
+    const res = await api.invoke("recap:agents", agentPeriod);
+    if (!res.ok) return agents.lastChild.replaceWith(card(h("div", { class: "empty" }, h("b", {}, "Couldn't count your sessions."), h("span", {}, res.error))));
+    const s = res.stats;
+    const stat = (k, v, sub) => h("div", { class: "stat" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v), h("div", { class: "s" }, sub));
+    const preview = h("div");
+    const share = h("button", { class: "btn accent", disabled: !s.ms, onclick: () => {
+      const { title: t, range } = recapTitle(agentPeriod, s);
+      const url = recapImage(s, { kind: S.settings.character, title: t, range, platform: isMac ? "darwin" : "win32" });
+      const status = h("span", { class: "note" });
+      const saved = (file) => status.replaceChildren(`Saved to ${file} `, h("button", { class: "link", onclick: () => api.send("recap:showFile", file) }, isMac ? "Show in Finder" : "Show in folder"));
+      preview.replaceChildren(card(h("div", { class: "share" },
+        h("img", { src: url, alt: `${t}, ${range}` }),
+        h("div", { class: "share-actions" },
+          h("button", { class: "btn accent", onclick: async () => { const r = await api.invoke("recap:saveImage", { dataUrl: url, name: `${t} ${range}` }); r.ok ? saved(r.file) : status.replaceChildren(r.error); } }, "Save image"),
+          h("button", { class: "btn", onclick: async () => {
+            try {
+              const png = Uint8Array.from(atob(url.split(",")[1]), (ch) => ch.charCodeAt(0));
+              await navigator.clipboard.write([new ClipboardItem({ "image/png": new Blob([png], { type: "image/png" }) })]);
+              status.replaceChildren("Copied. Paste it anywhere.");
+            } catch (err) {
+              status.replaceChildren(`Couldn't copy: ${err.message}`);
+            }
+          } }, "Copy image"),
+          status))));
+      preview.scrollIntoView({ behavior: "smooth" });
+    } }, "Share as an image");
+    agents.replaceChildren(
+      label("You and your agents"),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } }, picker, h("span", { style: { flex: "1" } }), share),
+      s.ms
+        ? h("div", { class: "stats" },
+            stat("Time with agents", hm(s.ms), `${num(s.sessions)} Claude Code session${s.sessions === 1 ? "" : "s"}`),
+            stat("Lines changed", num(s.lines.added + s.lines.removed), `+${num(s.lines.added)}  −${num(s.lines.removed)}`),
+            stat("Files edited", num(s.files), `${num(s.commands)} commands run`),
+            stat("Busiest day", s.busiestDay?.name ?? "–", s.topProject ? `Top project: ${s.topProject.name}` : ""))
+        : card(h("div", { class: "empty" }, h("b", {}, "No time with your agents yet."), h("span", {}, "Your Claude Code sessions in the terminal, the Claude app or VS Code show up here."))),
+      preview,
+    );
+  };
   await draw();
+  drawAgents();
 };
 
 PAGES.activity = async (root) => {

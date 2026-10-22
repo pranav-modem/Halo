@@ -6,14 +6,15 @@
 import fs from "node:fs";
 import path from "node:path";
 
+/** day = today, week = this week so far, lastweek = Monday to Sunday before it. */
 export function periodRange(period, now = new Date()) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
-  if (period === "week") {
-    const day = (start.getDay() + 6) % 7; // Monday = 0
-    start.setDate(start.getDate() - day);
-  }
-  return { start: start.getTime(), end: now.getTime() };
+  if (period === "week" || period === "lastweek") start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // Monday
+  if (period !== "lastweek") return { start: start.getTime(), end: now.getTime() };
+  const end = start.getTime();
+  start.setDate(start.getDate() - 7);
+  return { start: start.getTime(), end };
 }
 
 export function recapStats({ store, notesList, historyList, period }) {

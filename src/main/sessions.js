@@ -62,6 +62,17 @@ const short = (s, n) => {
 };
 
 /** "Edit room.js", "Run npm test" — what a tool call is doing, in a few words. */
+/** The folder a session started in, worked out from its transcript's folder name. */
+export function launchFolder(file) {
+  return decodeDir(base(path.dirname(file)));
+}
+
+/** What to call a session: its folder, or its title for a Claude app chat that has no folder. */
+export function projectName(cwd, title = "") {
+  const folder = base(cwd);
+  return /[\\/]scratch-workspaces[\\/]/.test(cwd) && /^scratch-/.test(folder) ? title || "Claude chat" : folder;
+}
+
 export function describeTool(name, input = {}) {
   const file = base(input.file_path || input.notebook_path || input.path);
   switch (name) {
@@ -205,9 +216,8 @@ export function parseSession(file, { mtimeMs, size }, now = Date.now(), prev = n
   }
   if (age > SHOW_FOR_MS || (status === "done" && age > DONE_FOR_MS)) return null;
 
-  const folder = base(cwd);
-  const scratch = /[\\/]scratch-workspaces[\\/]/.test(cwd) && /^scratch-/.test(folder);
-  const project = scratch ? (title || "Claude chat") : folder;
+  const project = projectName(cwd, title);
+  const scratch = project !== base(cwd);
   const recent = steps.slice(-6).map(({ label, tool, open, failed }) => ({ label, tool, state: open ? "running" : failed ? "failed" : "done" }));
   return {
     id: sessionId || base(file).replace(/\.jsonl$/, ""),

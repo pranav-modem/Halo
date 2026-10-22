@@ -1,30 +1,13 @@
 // Renders a still frame of a character to PNG data URLs for the app and tray
 // icons (used by scripts/make-icons.mjs). Same drawing code as the desktop character.
 
-import { Character } from "./characters/engine.js";
+import { stillCharacter } from "./characters/still.js";
 
 const canvas = document.getElementById("c");
 
 function still(kind, px, { background = false } = {}) {
-  canvas.style.width = `${px}px`;
-  canvas.style.height = `${px}px`;
-  canvas.width = px;
-  canvas.height = px;
-  const b = new Character(canvas, { kind, R: px * (background ? 0.25 : 0.3), center: { x: px / 2, y: px * (background ? 0.47 : 0.45) } });
-  b.observer.disconnect();
-  b.dpr = 1;
-  canvas.width = px;
-  canvas.height = px;
-  b.w = px;
-  b.h = px;
-  b.blink = 1;
-  b.lookAt(0.15, 0.25);
-  b.lx = 0.15;
-  b.ly = 0.25;
-  b.frame(1.2, 0);
-  b.particles = [];
-  b.frame(1.2, 0);
-  if (!background) return canvas.toDataURL("image/png");
+  const art = stillCharacter(kind, px, { R: px * (background ? 0.25 : 0.3), center: { x: px / 2, y: px * (background ? 0.47 : 0.45) } });
+  if (!background) return art.toDataURL("image/png");
 
   // App icon: the character on a soft rounded square.
   const out = document.createElement("canvas");
@@ -40,7 +23,7 @@ function still(kind, px, { background = false } = {}) {
   c.beginPath();
   c.roundRect(m, m, px - 2 * m, px - 2 * m, r);
   c.fill();
-  c.drawImage(canvas, 0, 0);
+  c.drawImage(art, 0, 0);
   return out.toDataURL("image/png");
 }
 
