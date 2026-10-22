@@ -57,7 +57,8 @@
       "package.json",
       "!src/renderer/gallery.*",
       "!src/renderer/icon-render.*",
-      "!node_modules/onnxruntime-node/bin/napi-v*/linux/**"
+      "!node_modules/onnxruntime-node/bin/napi-v*/linux/**",
+      "!node_modules/onnxruntime-web/**"
     ],
     "asarUnpack": [
       "src/hook/**",
@@ -79,6 +80,14 @@
       "icon": "assets/icon.png",
       "identity": null,
       "files": [
+        "src/**/*",
+        "assets/**/*",
+        "models/**/*",
+        "package.json",
+        "!src/renderer/gallery.*",
+        "!src/renderer/icon-render.*",
+        "!node_modules/onnxruntime-node/bin/napi-v*/linux/**",
+        "!node_modules/onnxruntime-web/**",
         "!node_modules/onnxruntime-node/bin/napi-v*/win32/**",
         "!node_modules/@img/sharp-win32-*/**"
       ],
@@ -108,6 +117,14 @@
       "icon": "assets/icon.png",
       "signAndEditExecutable": false,
       "files": [
+        "src/**/*",
+        "assets/**/*",
+        "models/**/*",
+        "package.json",
+        "!src/renderer/gallery.*",
+        "!src/renderer/icon-render.*",
+        "!node_modules/onnxruntime-node/bin/napi-v*/linux/**",
+        "!node_modules/onnxruntime-web/**",
         "!node_modules/onnxruntime-node/bin/napi-v*/darwin/**",
         "!node_modules/@img/sharp-darwin-*/**",
         "!node_modules/@img/sharp-libvips-darwin*/**"
