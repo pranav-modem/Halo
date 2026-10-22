@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:" />
+<title>Halo</title>
+<link rel="stylesheet" href="./panel.css" />
+</head>
+<body>
+  <!-- Header: icon tabs on the left, tools on the right. -->
+  <header class="head" id="head">
+    <nav class="tabs" role="tablist" aria-label="Halo">
+      <button role="tab" class="tab" data-tab="home" aria-selected="true" title="Home" aria-label="Home"><span class="ico" data-icon="home"></span></button>
+      <button role="tab" class="tab" data-tab="chat" title="Ask Halo" aria-label="Ask Halo"><span class="ico" data-icon="chat"></span></button>
+      <button role="tab" class="tab" data-tab="board" title="What needs you" aria-label="What needs you"><span class="ico" data-icon="board"></span><span class="tab-badge" id="board-badge" hidden></span></button>
+      <button role="tab" class="tab" data-tab="notes" title="Meeting notes" aria-label="Meeting notes"><span class="ico" data-icon="notes"></span><span class="tab-dot" id="rec-dot" hidden></span></button>
+    </nav>
+    <span class="grow"></span>
+    <div class="usage" id="usage" hidden></div>
+    <button class="hush" id="btn-stop" hidden>Stop</button>
+    <button class="hicon wake" id="btn-wake" aria-pressed="true" title="Listening for “Hey Halo”" aria-label="Stop listening for Hey Halo"><span class="ico" data-icon="mic"></span></button>
+    <button class="hicon" id="btn-theme" title="Light" aria-label="Switch between light and dark"><span class="ico" data-icon="sun"></span></button>
+    <button class="hicon" id="btn-settings" title="Settings" aria-label="Settings"><span class="ico" data-icon="gear"></span></button>
+    <button class="hicon" id="btn-full" title="Full screen" aria-label="Full screen"><span class="ico" data-icon="expand"></span></button>
+    <button class="hicon" id="btn-close" title="Close (Esc)" aria-label="Close"><span class="ico" data-icon="close"></span></button>
+  </header>
+
+  <main>
+    <!-- Home: what Halo is doing + your apps -->
+    <section class="view active" id="view-home">
+      <div class="card session wash-violet" id="session">
+        <div class="session-body" id="session-body"></div>
+      </div>
+      <div class="card apps wash-teal">
+        <div class="card-label">Your apps</div>
+        <div class="pills" id="pills"></div>
+      </div>
+      <div class="card list-card wash-amber">
+        <div class="card-label">What needs you <button class="link" id="see-board">See all</button></div>
+        <div id="home-board"></div>
+      </div>
+      <div class="card list-card wash-pink">
+        <div class="card-label">Recent chats <button class="link" id="see-chats">All chats</button></div>
+        <div id="home-recent"></div>
+      </div>
+    </section>
+
+    <!-- Chat -->
+    <section class="view" id="view-chat">
+      <div class="chathead">
+        <button class="hicon sm" id="btn-chats" title="Chats" aria-label="Chats"><span class="ico" data-icon="list"></span></button>
+        <button class="model" id="model-btn" title="Model">Claude · Default ▾</button>
+        <span class="thread" id="thread-title"></span>
+        <span class="grow"></span>
+        <button class="new" id="btn-new">+ New</button>
+      </div>
+      <div class="popover" id="chats-menu" hidden></div>
+      <div class="popover model-menu" id="model-menu" hidden></div>
+      <div class="messages" id="messages">
+        <div class="chat-empty" id="chat-empty">
+          <div class="headline">Ask me anything.</div>
+          <div class="sub">I can check Ninety, Jira, GitHub and Slack, look at a window you drop me on, or take notes in a meeting.</div>
+          <div class="chips">
+            <button class="chip" data-quick="brief">Brief me</button>
+            <button class="chip" data-quick="rocks">My Rocks</button>
+            <button class="chip" data-quick="prs">PRs to review</button>
+            <button class="chip" data-quick="jira">My Jira</button>
+            <button class="chip" data-quick="slack">Slack mentions</button>
+            <button class="chip" data-quick="screen">Explain my screen</button>
+          </div>
+        </div>
+      </div>
+      <div class="notice" id="notice" hidden></div>
+      <div class="approvals" id="approvals"></div>
+      <form class="composer" id="composer" autocomplete="off">
+        <div class="attachments" id="attachments" hidden></div>
+        <div class="chips small" id="shot-chips" hidden>
+          <button type="button" class="chip" data-shot="Explain what's on this screenshot and what matters in it.">Explain</button>
+          <button type="button" class="chip" data-shot="Summarize what's on this screenshot in a few bullets.">Summarize</button>
+          <button type="button" class="chip" data-shot="Draft a reply to the message on this screenshot. Keep my tone; short.">Draft a reply</button>
+          <button type="button" class="chip" data-shot="Find the bug or error on this screenshot and suggest a fix.">Find the bug</button>
+          <button type="button" class="chip" data-shot="Draft a Jira ticket from this screenshot: summary, description, acceptance criteria. Show it to me before creating anything.">Jira ticket</button>
+        </div>
+        <div class="input-row">
+          <textarea id="input" rows="1" placeholder="Ask Halo…" aria-label="Message"></textarea>
+          <button type="button" class="round" id="btn-screen" title="Show Halo my screen" aria-label="Show Halo my screen"><span class="ico" data-icon="screen"></span></button>
+          <button type="button" class="round" id="btn-snip" title="Snip a region" aria-label="Snip a region"><span class="ico" data-icon="snip"></span></button>
+          <button type="button" class="round mic" id="btn-mic" title="Talk instead of typing" aria-label="Talk instead of typing"><span class="ico" data-icon="mic"></span></button>
+          <button type="submit" class="round send" id="btn-send" title="Send" aria-label="Send"><span class="ico" data-icon="up"></span></button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Board: what needs you -->
+    <section class="view scroll" id="view-board">
+      <div class="view-head">
+        <div><div class="view-title">What needs you</div><div class="meta" id="board-updated"></div></div>
+        <span class="grow"></span>
+        <button class="pill" id="board-refresh">Check now</button>
+        <button class="pill primary" id="board-brief">Brief me</button>
+      </div>
+      <div id="board"></div>
+    </section>
+
+    <!-- Notes -->
+    <section class="view scroll" id="view-notes">
+      <div class="view-head"><div class="view-title">Meeting notes</div></div>
+      <div class="card recorder wash-red" id="recorder">
+        <div class="rec-row">
+          <input id="rec-title" placeholder="What's the meeting? (optional)" aria-label="Meeting title" />
+          <button class="pill rec" id="rec-btn"><span class="rec-icon"></span><span id="rec-label">Take notes</span></button>
+        </div>
+        <div class="rec-meta">
+          <canvas id="rec-level" width="96" height="14" aria-hidden="true"></canvas>
+          <span id="rec-time" class="mono">00:00</span>
+          <span class="grow"></span>
+          <label class="check"><input type="checkbox" id="rec-system" /> Include system audio</label>
+        </div>
+        <div class="hint" id="rec-hint">Tell people you're recording. Audio stays on this computer and is deleted once it's written down.</div>
+        <div class="progress" id="model-progress" hidden><div class="bar"><span></span></div><span class="label"></span></div>
+        <div class="transcript" id="live-transcript" hidden></div>
+      </div>
+      <div id="note-result"></div>
+      <details class="card fold wash-cyan">
+        <summary>Paste a transcript</summary>
+        <input id="paste-title" placeholder="Title" aria-label="Transcript title" />
+        <textarea id="paste-text" rows="5" placeholder="Paste a transcript and Halo writes the notes."></textarea>
+        <div class="row-end"><button class="pill primary" id="paste-go">Write notes</button></div>
+      </details>
+      <details class="card fold wash-green">
+        <summary>Quick note</summary>
+        <textarea id="quick-text" rows="4" placeholder="Jot something down…"></textarea>
+        <div class="row-end"><button class="pill primary" id="quick-save">Save note</button></div>
+      </details>
+      <div class="card list-card wash-indigo">
+        <div class="card-label">All notes <button class="link" id="notes-folder">Open folder</button></div>
+        <input id="notes-search" class="search" placeholder="Search notes" aria-label="Search notes" />
+        <div id="notes-list"></div>
+      </div>
+      <div class="card note-view wash-violet" id="note-view" hidden></div>
+    </section>
+  </main>
+
+  <script type="module" src="./panel.js"></script>
+</body>
+</html>

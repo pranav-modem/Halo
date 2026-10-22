@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+<title>Halo Island</title>
+<style>
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none; }
+  body { font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; color: #F5F6F8; }
+  #island {
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    height: var(--h, 32px); width: var(--w, 200px);
+    background: #000; border-radius: 0 0 14px 14px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 6px; box-sizing: border-box;
+    transition: width .5s cubic-bezier(.32,1.28,.5,1), height .5s cubic-bezier(.32,1.2,.5,1), border-radius .3s;
+    cursor: pointer; animation: drop .45s cubic-bezier(.32,1.28,.5,1);
+  }
+  #island.wide { width: var(--wide, 300px); height: calc(var(--h, 32px) + 4px); border-radius: 0 0 18px 18px; }
+  @keyframes drop { from { transform: translateX(-50%) translateY(-100%); } }
+  #pal { width: 34px; height: 30px; flex: none; }
+  .right { display: flex; align-items: center; gap: 7px; overflow: hidden; white-space: nowrap; }
+  .status { color: #8E939C; font-weight: 600; opacity: 0; transition: opacity .25s .12s; }
+  #island.wide .status { opacity: 1; }
+  .badge { min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px; background: #F5A524; color: #0B0C0E; font-size: 10.5px; display: grid; place-items: center; box-sizing: border-box; }
+  .light { width: 7px; height: 7px; border-radius: 50%; background: var(--c, #6B7079); box-shadow: 0 0 8px var(--c, transparent); }
+  .notch-gap { flex: 1; }
+</style>
+</head>
+<body>
+  <div id="island" role="button" aria-label="Open Halo" tabindex="0">
+    <canvas id="pal" aria-hidden="true"></canvas>
+    <span class="notch-gap"></span>
+    <div class="right"><span class="status" id="status">Ready</span><span class="badge" id="badge" hidden>0</span><span class="light" id="light"></span></div>
+  </div>
+  <script type="module" src="./island.js"></script>
+</body>
+</html>
