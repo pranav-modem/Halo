@@ -140,17 +140,19 @@ function dock() {
   setupTray();
 }
 
+/** Back on the desktop. `point.carry`: pulled out of the island, and still being dragged. */
 function undock(point) {
   if (!store.get("docked")) return;
   store.set("docked", false);
-  island.hide();
   let pos = companion.restorePosition();
-  if (point) {
-    const c = companion.clamp(Math.round(point.screenX - CHAR.x), Math.round(point.screenY - CHAR.y + 30));
-    pos = c;
-  }
+  if (point?.carry) pos = { x: Math.round(point.screenX - CHAR.x), y: Math.round(point.screenY - CHAR.y) };
+  else if (point) pos = companion.clamp(Math.round(point.screenX - CHAR.x), Math.round(point.screenY - CHAR.y + 30));
+  // While carried, the island stays (invisible) to keep receiving the drag.
+  if (point?.carry) island.win?.setOpacity(0);
+  else island.hide();
   companion.win?.setBounds({ x: pos.x, y: pos.y, width: companion.win.getBounds().width, height: companion.win.getBounds().height });
   companion.win?.showInactive();
+  if (point?.carry) companion.dragStart(point);
   companion.savePosition();
   companion.send("companion:emote", "surprised");
   mood.sent = null;
@@ -764,6 +766,14 @@ function wireIpc() {
   ipcMain.on("island:mouse", (_e, over) => island.setMouse(!!over));
   ipcMain.on("island:click", () => togglePanel());
   ipcMain.on("island:undock", (_e, p) => undock(p));
+  ipcMain.on("island:dragEnd", () => {
+    const showedWindow = !!companion.dragging?.armed;
+    companion.dragEnd();
+    island.hide();
+    island.win?.setOpacity(1);
+    // Carried out of the island just to show Halo a window: rest in the island again.
+    if (showedWindow) setTimeout(dock, 600);
+  });
 
   // capture
   ipcMain.on("capture:screen", () => askAboutScreen(false));

@@ -39,8 +39,12 @@ api.on("companion:emote", (e) => pal.emote(e));
 
 // Hover: the window ignores the mouse except over the tab (forwarded moves tell us).
 let hover = false;
+let press = null; // a click or drag in progress
+let carrying = false; // pulled out of the island and still being dragged
+let clickTimer = 0;
+
 function setHover(h) {
-  if (h === hover) return;
+  if (h === hover || carrying) return; // keep the drag's events while Halo is carried out
   hover = h;
   api.send("island:mouse", h);
   pal.setHover(h);
@@ -55,27 +59,42 @@ addEventListener("mousemove", (e) => {
 addEventListener("mouseleave", () => setHover(false));
 api.on("companion:cursor", ({ dx, dy }) => pal.lookAt(Math.tanh(dx / 260), Math.tanh(dy / 200)));
 
-// Click opens the chat; drag down (or out) puts Halo back on the desktop.
-let press = null;
+// Click opens the chat; double-click puts Halo back on the desktop. Dragging
+// down pulls Halo out and keeps carrying it: drop it on a window to show it
+// that window, or anywhere else to leave it on the desktop.
 island.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   press = { x: e.screenX, y: e.screenY };
   island.setPointerCapture(e.pointerId);
 });
 island.addEventListener("pointermove", (e) => {
+  if (carrying) return api.send("companion:dragMove", { screenX: e.screenX, screenY: e.screenY });
   if (!press) return;
   if (e.screenY - press.y > 22 || Math.abs(e.screenX - press.x) > 60) {
     press = null;
-    api.send("island:undock", { screenX: e.screenX, screenY: e.screenY });
+    carrying = true;
+    api.send("island:undock", { screenX: e.screenX, screenY: e.screenY, carry: true });
   }
 });
+const endCarry = () => {
+  if (!carrying) return false;
+  carrying = false;
+  api.send("island:dragEnd");
+  return true;
+};
 island.addEventListener("pointerup", () => {
-  if (!press) return;
+  if (endCarry() || !press) return;
   press = null;
   pal.poke();
-  api.send("island:click");
+  // Wait a moment: opening the chat right away would swallow a double-click.
+  clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => api.send("island:click"), 260);
 });
-island.addEventListener("dblclick", () => api.send("island:undock", null));
+island.addEventListener("lostpointercapture", endCarry);
+island.addEventListener("dblclick", () => {
+  clearTimeout(clickTimer);
+  api.send("island:undock", null);
+});
 island.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   api.send("companion:menu");
